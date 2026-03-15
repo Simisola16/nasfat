@@ -39,7 +39,7 @@ export default function ClientRegister() {
     <div className="auth-container">
       <div className="glass-card" style={{ maxWidth: '540px' }}>
         <div className="card-header">
-          <h1 className="card-title">Register Account</h1>
+          <h1 className="card-title">Create Account</h1>
           <p style={{ color: 'var(--text-muted)' }}>Start your savings journey today</p>
         </div>
 
@@ -136,7 +136,7 @@ export default function ClientRegister() {
           </div>
 
           <button type="submit" className="btn btn-primary" disabled={loading}>
-            {loading ? 'Creating Account...' : <>Create Account <ArrowRight size={18} /></>}
+            {loading ? 'Creating Account...' : <><ArrowRight size={18} /> Create Account</>}
           </button>
         </form>
 

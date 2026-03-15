@@ -68,7 +68,7 @@ export default function ClientLogin() {
         </form>
 
         <div className="auth-links">
-          <span>Don't have an account? <Link to="/client/register">Register</Link></span>
+          <span>Don't have an account? <Link to="/client/register">Create Account</Link></span>
           <span><Link to="/" style={{ color: 'var(--text-muted)' }}>Back to Home</Link></span>
         </div>
       </div>

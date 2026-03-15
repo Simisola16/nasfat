@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
-import { Shield, UserPlus, LogIn, LineChart } from 'lucide-react';
+import { Shield, UserPlus, LogIn } from 'lucide-react';
+import nasfatLogo from '../assets/nasfat logo.jpeg';
 
 export default function Home() {
   return (
@@ -7,11 +8,13 @@ export default function Home() {
       <div className="glass-card" style={{ maxWidth: '600px', animationDelay: '0.1s' }}>
         <div className="card-header">
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
-            <div style={{ background: 'linear-gradient(135deg, var(--primary), var(--secondary))', padding: '1.5rem', borderRadius: '50%', display: 'inline-flex' }}>
-              <LineChart size={48} color="white" />
-            </div>
+            <img
+              src={nasfatLogo}
+              alt="NASFAT Logo"
+              style={{ height: '120px', width: 'auto', objectFit: 'contain' }}
+            />
           </div>
-          <h1 className="card-title" style={{ fontSize: '2.5rem' }}>Savings Dashboard</h1>
+          <h1 className="card-title" style={{ fontSize: '2rem' }}>NASFAT Grays Thurrock Cooperative</h1>
           <p style={{ color: 'var(--text-muted)' }}>Securely manage your deposits, track progress, and build your future.</p>
         </div>
 
@@ -25,11 +28,11 @@ export default function Home() {
                 <LogIn size={18} /> Login
               </Link>
               <Link to="/client/register" className="btn btn-outline">
-                <UserPlus size={18} /> Register
+                <UserPlus size={18} /> Create Account
               </Link>
             </div>
           </div>
-          
+
           {/* Removed admin block per request */}
         </div>
       </div>
