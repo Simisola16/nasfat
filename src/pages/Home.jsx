@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Shield, UserPlus, LogIn } from 'lucide-react';
-import nasfatLogo from '../assets/nasfat-logo.jpeg';
+import nasfatLogo from '../assets/nasfat-logo.png';
 
 export default function Home() {
   return (
@@ -14,14 +14,14 @@ export default function Home() {
               style={{ height: '120px', width: 'auto', objectFit: 'contain' }}
             />
           </div>
-          <h1 className="card-title" style={{ fontSize: '2rem' }}>NASFAT Grays Thurrock Cooperative</h1>
+          <h1 className="card-title" style={{ fontSize: '2rem' }}>Cooperative Dashboard</h1>
           <p style={{ color: 'var(--text-muted)' }}>Securely manage your deposits, track progress, and build your future.</p>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginTop: '2rem' }}>
           <div style={{ padding: '1.5rem', border: '1px solid var(--glass-border)', borderRadius: '12px', background: 'rgba(255,255,255,0.02)' }}>
             <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <UserPlus className="text-primary" /> For Clients
+              <UserPlus className="text-primary" /> For Member
             </h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <Link to="/client/login" className="btn btn-primary">
