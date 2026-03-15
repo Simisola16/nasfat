@@ -21,7 +21,7 @@ export default function ClientLogin() {
     <div className="auth-container">
       <div className="glass-card">
         <div className="card-header">
-          <h1 className="card-title">Client Login</h1>
+          <h1 className="card-title">Member Login</h1>
           <p style={{ color: 'var(--text-muted)' }}>Sign in to your savings dashboard</p>
         </div>
 
