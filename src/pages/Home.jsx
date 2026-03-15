@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Shield, UserPlus, LogIn } from 'lucide-react';
-import nasfatLogo from '../assets/nasfat logo.jpeg';
+import nasfatLogo from '../assets/nasfat-logo.jpeg';
 
 export default function Home() {
   return (
