@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { User, Mail, Lock, Image as ImageIcon, Calendar, ArrowRight } from 'lucide-react';
+import API from '../api';
 
 export default function ClientRegister() {
   const navigate = useNavigate();
@@ -23,16 +24,36 @@ export default function ClientRegister() {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
     setError('');
 
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
+      setLoading(false);
       return;
     }
 
-    navigate('/client/login');
+    try {
+      const data = new FormData();
+      data.append('fullName', formData.fullName);
+      data.append('email', formData.email);
+      data.append('password', formData.password);
+      data.append('paymentFrequency', formData.paymentFrequency);
+      if (formData.image) {
+        data.append('image', formData.image);
+      }
+
+      await API.post('/api/auth/register', data, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      navigate('/client/login');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Registration failed');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

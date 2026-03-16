@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock, Shield, ArrowRight } from 'lucide-react';
+import { Mail, Lock, Shield, ArrowRight, AlertTriangle } from 'lucide-react';
+
+import API from '../api';
 
 export default function AdminLogin() {
   const navigate = useNavigate();
@@ -10,15 +12,24 @@ export default function AdminLogin() {
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
-    if (formData.email === 'admin@nasfat.com' && formData.password === 'admin123') {
+    try {
+      const { data } = await API.post('/api/auth/admin-login', formData);
+      console.log(data);
+      if(data.admin.role !== 'admin'){
+        alert("You are not authorized to login as admin");
+        return;
+      }
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('admin', JSON.stringify(data.admin));
       navigate('/admin/dashboard');
-    } else {
-      setError('Invalid admin credentials');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Invalid admin credentials');
+    } finally {
       setLoading(false);
     }
   };
