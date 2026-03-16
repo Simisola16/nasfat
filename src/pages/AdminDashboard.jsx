@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Users, FileText, Ban, Eye, LogOut, Search } from 'lucide-react';
 import API from '../api';
+import { useNotification } from '../context/NotificationContext';
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const { showNotification } = useNotification();
   
   // Modals state
   const [showReceiptModal, setShowReceiptModal] = useState(false);
@@ -59,7 +61,7 @@ export default function AdminDashboard() {
     setLoading(true);
     try {
       await API.put(`/api/admin/verify-saving/${savingId}`, { status: 'paid' });
-      alert("Payment verified successfully!");
+      showNotification("Payment verified successfully!", 'success');
       // Refresh data
       if (activeClient) {
         const res = await API.get(`/api/admin/client/${activeClient._id}/savings`);
@@ -70,7 +72,7 @@ export default function AdminDashboard() {
       setClients(resAdmin.data.clients || []);
     } catch (err) {
       console.error("Failed to verify payment:", err);
-      alert(err.response?.data?.message || "Verification failed");
+      showNotification(err.response?.data?.message || "Verification failed", 'error');
     } finally {
       setLoading(false);
     }

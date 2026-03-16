@@ -1,21 +1,20 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, ArrowRight } from 'lucide-react';
-
 import API from '../api';
+import { useNotification } from '../context/NotificationContext';
 
 export default function ClientLogin() {
   const navigate = useNavigate();
+  const { showNotification } = useNotification();
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
 
     try {
       const { data } = await API.post('/api/auth/login', formData);
@@ -23,7 +22,7 @@ export default function ClientLogin() {
       localStorage.setItem('user', JSON.stringify(data.user));
       navigate('/client/dashboard');
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed');
+      showNotification(err.response?.data?.message || 'Login failed', 'error');
     } finally {
       setLoading(false);
     }
@@ -38,7 +37,6 @@ export default function ClientLogin() {
         </div>
 
         <form onSubmit={handleSubmit}>
-          {error && <div style={{ color: '#ef4444', marginBottom: '1rem', fontSize: '0.875rem' }}>{error}</div>}
           
           <div className="form-group">
             <label className="form-label">Email Address</label>

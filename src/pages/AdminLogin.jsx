@@ -1,34 +1,32 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, Shield, ArrowRight, AlertTriangle } from 'lucide-react';
-
 import API from '../api';
+import { useNotification } from '../context/NotificationContext';
 
 export default function AdminLogin() {
   const navigate = useNavigate();
+  const { showNotification } = useNotification();
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
 
     try {
       const { data } = await API.post('/api/auth/admin-login', formData);
-      console.log(data);
       if(data.admin.role !== 'admin'){
-        alert("You are not authorized to login as admin");
+        showNotification("You are not authorized to login as admin", 'error');
         return;
       }
       localStorage.setItem('token', data.token);
       localStorage.setItem('admin', JSON.stringify(data.admin));
       navigate('/admin/dashboard');
     } catch (err) {
-      setError(err.response?.data?.message || 'Invalid admin credentials');
+      showNotification(err.response?.data?.message || 'Invalid admin credentials', 'error');
     } finally {
       setLoading(false);
     }
@@ -49,7 +47,6 @@ export default function AdminLogin() {
         </div>
 
         <form onSubmit={handleSubmit} className="admin">
-          {error && <div style={{ color: '#ef4444', marginBottom: '1rem', fontSize: '0.875rem' }}>{error}</div>}
           
           <div className="form-group">
             <label className="form-label">Admin Email</label>

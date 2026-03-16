@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Wallet, PiggyBank, Upload, Plus, LogOut, FileText } from 'lucide-react';
 import API from '../api';
+import { useNotification } from '../context/NotificationContext';
 
 export default function ClientDashboard() {
   const navigate = useNavigate();
+  const { showNotification } = useNotification();
   const [loading, setLoading] = useState(false);
   const [savingsMode, setSavingsMode] = useState('monthly'); // 'weekly' or 'monthly'
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -73,7 +75,7 @@ export default function ClientDashboard() {
 
   const submitReceipt = async () => {
     if (!receiptFile || !savingsAmount) {
-      alert('Please enter an amount and select a receipt file.');
+      showNotification('Please enter an amount and select a receipt file.', 'info');
       return;
     }
 
@@ -87,14 +89,14 @@ export default function ClientDashboard() {
       await API.post('/api/client/savings', data, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      alert(`Successfully submitted receipt for ₦${savingsAmount}!`);
+      showNotification(`Successfully submitted receipt for ₦${savingsAmount}!`, 'success');
       setShowUploadModal(false);
       setReceiptFile(null);
       setSavingsAmount('');
       fetchDashboardData();
     } catch (err) {
       console.log(err);
-      alert(err.response?.data?.message || 'Failed to value receipt.');
+      showNotification(err.response?.data?.message || 'Failed to submit receipt.', 'error');
     } finally {
       setLoading(false);
     }
