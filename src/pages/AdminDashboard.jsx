@@ -19,6 +19,9 @@ export default function AdminDashboard() {
   const [clients, setClients] = useState([]);
   const [totalClients, setTotalClients] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [filterDate, setFilterDate] = useState('');
+  const [filterType, setFilterType] = useState('all');
+
 
   useEffect(() => {
     const fetchAdminData = async () => {
@@ -122,10 +125,34 @@ export default function AdminDashboard() {
     });
   };
 
-  const filteredClients = clients.filter(client => 
-    client.fullName?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    client.name?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handleActivate = async (client) => {
+    requestConfirmation(`Are you sure you want to activate ${client.fullName}'s account?`, async () => {
+      setLoading(true);
+      try {
+        await AdminAPI.put(`/api/admin/activate-client/${client._id}`);
+        showNotification('Client activated successfully!', 'success');
+        // Refresh list
+        const resAdmin = await AdminAPI.get('/api/admin/dashboard');
+        setClients(resAdmin.data.clients || []);
+      } catch (err) {
+        console.error("Failed to activate client:", err);
+        showNotification(err.response?.data?.message || 'Activation failed', 'error');
+      } finally {
+        setLoading(false);
+      }
+    });
+  };
+
+
+  const filteredClients = clients.filter(client => {
+    const matchesName = client.fullName?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                      client.name?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesType = filterType === 'all' || (client.paymentFrequency || '').toLowerCase() === filterType.toLowerCase();
+    const matchesDate = !filterDate || (client.createdAt || '').includes(filterDate);
+    return matchesName && matchesType && matchesDate;
+  });
+
+
 
   return (
     <div className="dashboard-container">
@@ -157,27 +184,54 @@ export default function AdminDashboard() {
       </div>
 
       <div className="table-container">
-        <div style={{ padding: '1.5rem 1.5rem 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ fontSize: '1.25rem', margin: 0 }}>Client Directory</h2>
-          <div className="form-group" style={{ marginBottom: 0, width: '300px' }}>
+        <div style={{ padding: '1.5rem 1.5rem 0', display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <h2 style={{ fontSize: '1.25rem', margin: 0, marginRight: 'auto' }}>Client Directory</h2>
+          
+          <div className="form-group" style={{ marginBottom: 0, width: '250px' }}>
             <Search className="input-icon" style={{ top: '0.875rem' }} size={18} />
             <input 
               type="text" 
               className="form-input" 
-              placeholder="Search by client name..." 
+              placeholder="Search by name..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{ padding: '0.75rem 1rem 0.75rem 2.5rem' }}
             />
           </div>
+
+          <div className="form-group" style={{ marginBottom: 0, width: '180px' }}>
+            <select 
+              className="form-select" 
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              style={{ padding: '0.75rem' }}
+            >
+              <option value="all">All Types</option>
+              <option value="weekly">Weekly Savings</option>
+              <option value="monthly">Monthly Savings</option>
+            </select>
+          </div>
+
+          <div className="form-group" style={{ marginBottom: 0, width: '180px' }}>
+            <input 
+              type="date" 
+              className="form-input" 
+              value={filterDate}
+              onChange={(e) => setFilterDate(e.target.value)}
+              style={{ padding: '0.75rem' }}
+            />
+          </div>
         </div>
+
         <table className="data-table">
           <thead>
             <tr>
               <th>Client Information</th>
+              <th>Total Savings</th>
               <th>Payment Status</th>
               <th>Actions</th>
               <th>Admin Actions</th>
+
             </tr>
           </thead>
           <tbody>
@@ -197,6 +251,12 @@ export default function AdminDashboard() {
                   </div>
                 </td>
                 <td>
+                  <div style={{ fontWeight: 'bold', color: 'var(--accent-orange)' }}>
+                    ₦{(client.totalSavings || 0).toLocaleString()}
+                  </div>
+                </td>
+
+                <td>
                   <span className={`status-badge status-${client.status || 'unpaid'}`}>
                     {(client.status || 'unpaid').toUpperCase()}
                   </span>
@@ -214,30 +274,35 @@ export default function AdminDashboard() {
                     <button 
                       className="btn btn-outline" 
                       style={{ padding: '0.5rem', width: 'auto' }}
-                      title="View Receipts"
-                      onClick={() => handleViewReceipt(client)}
-                    >
-                      <Eye size={16} /> View Receipts
-                    </button>
-                    <button 
-                      className="btn btn-outline" 
-                      style={{ padding: '0.5rem', width: 'auto' }}
                       title="Generate Statement"
                       onClick={() => handleGenerateStatement(client)}
                     >
-                      <FileText size={16} /> Generate Statement
+                      <FileText size={16} /> View Savings
                     </button>
                   </div>
+
                 </td>
                 <td>
-                  <button 
-                    className="btn btn-danger" 
-                    style={{ padding: '0.5rem 1rem', width: 'auto', fontSize: '0.875rem' }}
-                    onClick={() => handleDeactivate(client)}
-                    disabled={loading}
-                  >
-                    <Ban size={16} style={{ marginRight: '0.5rem' }} /> {loading ? 'Wait...' : 'Deactivate Client'}
-                  </button>
+                  {client.isDeactivated || client.status === 'deactivated' ? (
+                    <button 
+                      className="btn btn-primary" 
+                      style={{ padding: '0.5rem 1rem', width: 'auto', fontSize: '0.875rem', background: 'green' }}
+                      onClick={() => handleActivate(client)}
+                      disabled={loading}
+                    >
+                      <User size={16} style={{ marginRight: '0.5rem' }} /> {loading ? 'Wait...' : 'Activate Client'}
+                    </button>
+                  ) : (
+                    <button 
+                      className="btn btn-danger" 
+                      style={{ padding: '0.5rem 1rem', width: 'auto', fontSize: '0.875rem' }}
+                      onClick={() => handleDeactivate(client)}
+                      disabled={loading}
+                    >
+                      <Ban size={16} style={{ marginRight: '0.5rem' }} /> {loading ? 'Wait...' : 'Deactivate Client'}
+                    </button>
+                  )}
+
                 </td>
               </tr>
             ))}
@@ -408,17 +473,40 @@ export default function AdminDashboard() {
                       <th style={{ padding: '0.75rem', borderBottom: '1px solid #ddd' }}>Date</th>
                       <th style={{ padding: '0.75rem', borderBottom: '1px solid #ddd' }}>Type</th>
                       <th style={{ padding: '0.75rem', borderBottom: '1px solid #ddd', textAlign: 'right' }}>Amount</th>
+                      <th style={{ padding: '0.75rem', borderBottom: '1px solid #ddd', textAlign: 'right' }}>Receipt</th>
                       <th style={{ padding: '0.75rem', borderBottom: '1px solid #ddd', textAlign: 'right' }}>Status</th>
+
                     </tr>
                   </thead>
                   <tbody>
-                    {clientStatements.length > 0 ? (
-                      clientStatements.map((stmt, idx) => (
+                    {clientStatements.filter(stmt => {
+                      const matchesType = filterType === 'all' || (stmt.type || '').toLowerCase() === filterType.toLowerCase();
+                      const matchesDate = !filterDate || (stmt.createdAt || stmt.date || '').includes(filterDate);
+                      return matchesType && matchesDate;
+                    }).length > 0 ? (
+                      clientStatements.filter(stmt => {
+                        const matchesType = filterType === 'all' || (stmt.type || '').toLowerCase() === filterType.toLowerCase();
+                        const matchesDate = !filterDate || (stmt.createdAt || stmt.date || '').includes(filterDate);
+                        return matchesType && matchesDate;
+                      }).map((stmt, idx) => (
+
                         <tr key={idx}>
                           <td style={{ padding: '0.75rem', borderBottom: '1px solid #eee' }}>{stmt.createdAt || stmt.date ? new Date(stmt.createdAt || stmt.date).toLocaleDateString() : '-'}</td>
                           <td style={{ padding: '0.75rem', borderBottom: '1px solid #eee', textTransform: 'capitalize' }}>{stmt.type || stmt.description || 'Deposit'}</td>
                           <td style={{ padding: '0.75rem', borderBottom: '1px solid #eee', textAlign: 'right', color: 'green' }}>+₦{(stmt.amount || 0).toLocaleString()}</td>
                           <td style={{ padding: '0.75rem', borderBottom: '1px solid #eee', textAlign: 'right' }}>
+                            {stmt.receiptUrl ? (
+                              <button 
+                                className="btn btn-outline" 
+                                style={{ padding: '0.25rem 0.5rem', width: 'auto', fontSize: '0.75rem' }}
+                                onClick={() => window.open(stmt.receiptUrl, '_blank')}
+                              >
+                                <Eye size={14} /> View
+                              </button>
+                            ) : '-'}
+                          </td>
+                          <td style={{ padding: '0.75rem', borderBottom: '1px solid #eee', textAlign: 'right' }}>
+
                              <span className={`status-badge status-${stmt.status || 'pending'}`}>
                                {(stmt.status || 'pending').toUpperCase()}
                              </span>
@@ -433,9 +521,14 @@ export default function AdminDashboard() {
                       </tr>
                     )}
                     <tr style={{ fontWeight: 'bold' }}>
-                      <td colSpan="3" style={{ padding: '0.75rem', textAlign: 'right' }}>Total Saved:</td>
-                      <td style={{ padding: '0.75rem', textAlign: 'right' }}>₦{clientStatements.reduce((sum, s) => sum + (s.amount || 0), 0).toLocaleString()}</td>
+                      <td colSpan="3" style={{ padding: '0.75rem', textAlign: 'right' }}>Total Saved (Filtered):</td>
+                      <td style={{ padding: '0.75rem', textAlign: 'right' }}>₦{clientStatements.filter(stmt => {
+                        const matchesType = filterType === 'all' || (stmt.type || '').toLowerCase() === filterType.toLowerCase();
+                        const matchesDate = !filterDate || (stmt.createdAt || stmt.date || '').includes(filterDate);
+                        return matchesType && matchesDate;
+                      }).reduce((sum, s) => sum + (s.amount || 0), 0).toLocaleString()}</td>
                     </tr>
+
                   </tbody>
                 </table>
               </div>
