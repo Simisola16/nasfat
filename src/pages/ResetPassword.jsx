@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Lock, ArrowRight, ShieldCheck } from 'lucide-react';
-import API from '../api';
+import {API} from '../api';
 import { useNotification } from '../context/NotificationContext';
 
 export default function ResetPassword() {

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Users, FileText, Ban, Eye, LogOut, Search, User } from 'lucide-react';
-import API from '../api';
+import { AdminAPI } from '../api';
+
 import { useNotification } from '../context/NotificationContext';
 
 export default function AdminDashboard() {
@@ -28,9 +29,10 @@ export default function AdminDashboard() {
           return;
         }
         
-        const res = await API.get('/api/admin/dashboard');
+        const res = await AdminAPI.get('/api/admin/dashboard');
         setClients(res.data.clients || []);
         setTotalClients(res.data.totalClients || res.data.clients?.length || 0);
+
       } catch (err) {
         console.error("Failed to fetch admin dashboard data:", err);
       }
@@ -39,10 +41,11 @@ export default function AdminDashboard() {
   }, [navigate]);
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
+    localStorage.removeItem('adminToken');
     localStorage.removeItem('admin');
     navigate('/admin/login');
   };
+
 
   const handleViewProfile = (client) => {
     setActiveClient(client);
@@ -54,7 +57,8 @@ export default function AdminDashboard() {
     setShowReceiptModal(true);
     setClientStatements([]);
     try {
-      const res = await API.get(`/api/admin/client/${client._id}/savings`);
+      const res = await AdminAPI.get(`/api/admin/client/${client._id}/savings`);
+
       setClientStatements(res.data.savings || res.data.statements || []);
     } catch (err) {
       console.error("Failed to fetch client receipts:", err);
@@ -65,17 +69,18 @@ export default function AdminDashboard() {
     requestConfirmation("Are you sure you want to verify this payment?", async () => {
       setLoading(true);
       try {
-        await API.put(`/api/admin/verify-saving/${savingId}`, { status: 'paid' });
+        await AdminAPI.put(`/api/admin/verify-saving/${savingId}`, { status: 'paid' });
         showNotification("Payment verified successfully!", 'success');
         // Refresh data
         if (activeClient) {
-          const res = await API.get(`/api/admin/client/${activeClient._id}/savings`);
+          const res = await AdminAPI.get(`/api/admin/client/${activeClient._id}/savings`);
           setClientStatements(res.data.savings || res.data.statements || []);
         }
         // Also refresh main client list to update status badges
-        const resAdmin = await API.get('/api/admin/dashboard');
+        const resAdmin = await AdminAPI.get('/api/admin/dashboard');
         setClients(resAdmin.data.clients || []);
       } catch (err) {
+
         console.error("Failed to verify payment:", err);
         showNotification(err.response?.data?.message || "Verification failed", 'error');
       } finally {
@@ -90,7 +95,8 @@ export default function AdminDashboard() {
     setClientStatements([]); // reset before fetch
 
     try {
-      const res = await API.get(`/api/admin/client/${client._id}/savings`);
+      const res = await AdminAPI.get(`/api/admin/client/${client._id}/savings`);
+
       setClientStatements(res.data.savings || res.data.statements || []);
     } catch (err) {
       console.error("Failed to fetch specific client savings:", err);
@@ -101,12 +107,13 @@ export default function AdminDashboard() {
     requestConfirmation(`Are you sure you want to deactivate ${client.fullName}'s account?`, async () => {
       setLoading(true);
       try {
-        await API.put(`/api/admin/deactivate-client/${client._id}`);
+        await AdminAPI.put(`/api/admin/deactivate-client/${client._id}`);
         showNotification('Client deactivated successfully!', 'success');
         // Refresh list
-        const resAdmin = await API.get('/api/admin/dashboard');
+        const resAdmin = await AdminAPI.get('/api/admin/dashboard');
         setClients(resAdmin.data.clients || []);
       } catch (err) {
+
         console.error("Failed to deactivate client:", err);
         showNotification(err.response?.data?.message || 'Deactivation failed', 'error');
       } finally {

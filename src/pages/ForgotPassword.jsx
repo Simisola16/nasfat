@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, ArrowRight, ChevronLeft } from 'lucide-react';
-import API from '../api';
+import {API} from '../api';
 import { useNotification } from '../context/NotificationContext';
 
 export default function ForgotPassword() {

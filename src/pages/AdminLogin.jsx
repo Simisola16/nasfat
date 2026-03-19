@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, Shield, ArrowRight, AlertTriangle } from 'lucide-react';
-import API from '../api';
+import { AdminAPI } from '../api';
 import { useNotification } from '../context/NotificationContext';
 
 export default function AdminLogin() {
@@ -17,13 +17,15 @@ export default function AdminLogin() {
     setLoading(true);
 
     try {
-      const { data } = await API.post('/api/auth/admin-login', formData);
+      const { data } = await AdminAPI.post('/api/auth/admin-login', formData);
       if(data.admin.role !== 'admin'){
         showNotification("You are not authorized to login as admin", 'error');
         return;
       }
-      localStorage.setItem('token', data.token);
+      localStorage.setItem('adminToken', data.token);
       localStorage.setItem('admin', JSON.stringify(data.admin));
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
       navigate('/admin/dashboard');
     } catch (err) {
       showNotification(err.response?.data?.message || 'Invalid admin credentials', 'error');
@@ -31,6 +33,7 @@ export default function AdminLogin() {
       setLoading(false);
     }
   };
+
 
   return (
     <div className="auth-container admin" style={{ background: 'linear-gradient(135deg, rgba(26,26,30,1) 0%, rgba(240,90,40,0.1) 100%)' }}>

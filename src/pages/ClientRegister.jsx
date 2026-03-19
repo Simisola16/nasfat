@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { User, Mail, Lock, Image as ImageIcon, Calendar, ArrowRight, ShieldCheck } from 'lucide-react';
-import API from '../api';
+import {API} from '../api';
 import { useNotification } from '../context/NotificationContext';
 
 export default function ClientRegister() {

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Wallet, PiggyBank, Upload, Plus, LogOut, FileText } from 'lucide-react';
-import API from '../api';
+import {API} from '../api';
 import { useNotification } from '../context/NotificationContext';
 
 export default function ClientDashboard() {

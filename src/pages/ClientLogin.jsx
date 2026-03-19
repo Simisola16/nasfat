@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, ArrowRight } from 'lucide-react';
-import API from '../api';
+import {API} from '../api';
 import { useNotification } from '../context/NotificationContext';
 
 export default function ClientLogin() {
@@ -20,6 +20,8 @@ export default function ClientLogin() {
       const { data } = await API.post('/api/auth/login', formData);
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
+      localStorage.removeItem('adminToken');
+      localStorage.removeItem('admin');
       navigate('/client/dashboard');
     } catch (err) {
       showNotification(err.response?.data?.message || 'Login failed', 'error');
