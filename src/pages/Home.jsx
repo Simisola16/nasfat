@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Shield, UserPlus, LogIn } from 'lucide-react';
+import { UserPlus, LogIn } from 'lucide-react';
 import nasfatLogo from '../assets/nasfat-logo.png';
 
 export default function Home() {
@@ -32,8 +32,10 @@ export default function Home() {
               </Link>
             </div>
           </div>
-
-          {/* Removed admin block per request */}
+        </div>
+        
+        <div style={{ marginTop: '2.5rem', borderTop: '1px solid var(--glass-border)', paddingTop: '1.5rem', textAlign: 'center' }}>
+          <Link to="/privacy" style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Privacy Policy</Link>
         </div>
       </div>
     </div>

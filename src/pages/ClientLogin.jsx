@@ -67,9 +67,9 @@ export default function ClientLogin() {
           </div>
           
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.5rem' }}>
-            <a href="#" className="form-label" style={{ color: 'var(--primary)', cursor: 'pointer', marginBottom: 0 }}>
+            <Link to="/forgotpassword" style={{ color: 'var(--primary)', cursor: 'pointer', marginBottom: 0, fontSize: '0.875rem' }}>
               Forgot Password?
-            </a>
+            </Link>
           </div>
 
           <button type="submit" className="btn btn-primary" disabled={loading}>

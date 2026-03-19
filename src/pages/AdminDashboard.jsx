@@ -1,16 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, FileText, Ban, Eye, LogOut, Search } from 'lucide-react';
+import { Users, FileText, Ban, Eye, LogOut, Search, User } from 'lucide-react';
 import API from '../api';
 import { useNotification } from '../context/NotificationContext';
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const { showNotification } = useNotification();
+  const { showNotification, requestConfirmation } = useNotification();
   
   // Modals state
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [showStatementModal, setShowStatementModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [activeClient, setActiveClient] = useState(null);
   const [clientStatements, setClientStatements] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -43,6 +44,11 @@ export default function AdminDashboard() {
     navigate('/admin/login');
   };
 
+  const handleViewProfile = (client) => {
+    setActiveClient(client);
+    setShowProfileModal(true);
+  };
+
   const handleViewReceipt = async (client) => {
     setActiveClient(client);
     setShowReceiptModal(true);
@@ -56,26 +62,26 @@ export default function AdminDashboard() {
   };
 
   const handleVerifyPayment = async (savingId) => {
-    if (!window.confirm("Are you sure you want to verify this payment?")) return;
-    
-    setLoading(true);
-    try {
-      await API.put(`/api/admin/verify-saving/${savingId}`, { status: 'paid' });
-      showNotification("Payment verified successfully!", 'success');
-      // Refresh data
-      if (activeClient) {
-        const res = await API.get(`/api/admin/client/${activeClient._id}/savings`);
-        setClientStatements(res.data.savings || res.data.statements || []);
+    requestConfirmation("Are you sure you want to verify this payment?", async () => {
+      setLoading(true);
+      try {
+        await API.put(`/api/admin/verify-saving/${savingId}`, { status: 'paid' });
+        showNotification("Payment verified successfully!", 'success');
+        // Refresh data
+        if (activeClient) {
+          const res = await API.get(`/api/admin/client/${activeClient._id}/savings`);
+          setClientStatements(res.data.savings || res.data.statements || []);
+        }
+        // Also refresh main client list to update status badges
+        const resAdmin = await API.get('/api/admin/dashboard');
+        setClients(resAdmin.data.clients || []);
+      } catch (err) {
+        console.error("Failed to verify payment:", err);
+        showNotification(err.response?.data?.message || "Verification failed", 'error');
+      } finally {
+        setLoading(false);
       }
-      // Also refresh main client list to update status badges
-      const resAdmin = await API.get('/api/admin/dashboard');
-      setClients(resAdmin.data.clients || []);
-    } catch (err) {
-      console.error("Failed to verify payment:", err);
-      showNotification(err.response?.data?.message || "Verification failed", 'error');
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
   const handleGenerateStatement = async (client) => {
@@ -89,6 +95,24 @@ export default function AdminDashboard() {
     } catch (err) {
       console.error("Failed to fetch specific client savings:", err);
     }
+  };
+
+  const handleDeactivate = async (client) => {
+    requestConfirmation(`Are you sure you want to deactivate ${client.fullName}'s account?`, async () => {
+      setLoading(true);
+      try {
+        await API.put(`/api/admin/deactivate-client/${client._id}`);
+        showNotification('Client deactivated successfully!', 'success');
+        // Refresh list
+        const resAdmin = await API.get('/api/admin/dashboard');
+        setClients(resAdmin.data.clients || []);
+      } catch (err) {
+        console.error("Failed to deactivate client:", err);
+        showNotification(err.response?.data?.message || 'Deactivation failed', 'error');
+      } finally {
+        setLoading(false);
+      }
+    });
   };
 
   const filteredClients = clients.filter(client => 
@@ -175,6 +199,14 @@ export default function AdminDashboard() {
                     <button 
                       className="btn btn-outline" 
                       style={{ padding: '0.5rem', width: 'auto' }}
+                      title="View Profile"
+                      onClick={() => handleViewProfile(client)}
+                    >
+                      <User size={16} /> View Profile
+                    </button>
+                    <button 
+                      className="btn btn-outline" 
+                      style={{ padding: '0.5rem', width: 'auto' }}
                       title="View Receipts"
                       onClick={() => handleViewReceipt(client)}
                     >
@@ -191,8 +223,13 @@ export default function AdminDashboard() {
                   </div>
                 </td>
                 <td>
-                  <button className="btn btn-danger" style={{ padding: '0.5rem 1rem', width: 'auto', fontSize: '0.875rem' }}>
-                    <Ban size={16} style={{ marginRight: '0.5rem' }} /> Deactivate Client
+                  <button 
+                    className="btn btn-danger" 
+                    style={{ padding: '0.5rem 1rem', width: 'auto', fontSize: '0.875rem' }}
+                    onClick={() => handleDeactivate(client)}
+                    disabled={loading}
+                  >
+                    <Ban size={16} style={{ marginRight: '0.5rem' }} /> {loading ? 'Wait...' : 'Deactivate Client'}
                   </button>
                 </td>
               </tr>
@@ -207,6 +244,61 @@ export default function AdminDashboard() {
           </tbody>
         </table>
       </div>
+
+      {/* View Profile Modal */}
+      {showProfileModal && activeClient && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '500px' }}>
+            <div className="modal-header">
+              <h3 style={{ fontSize: '1.25rem', margin: 0 }}>Client Profile</h3>
+              <button 
+                className="btn btn-outline" 
+                style={{ width: 'auto', padding: '0.25rem 0.5rem', border: 'none' }}
+                onClick={() => setShowProfileModal(false)}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="modal-body" style={{ textAlign: 'center' }}>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <img 
+                  src={activeClient.profileImage || 'https://i.pravatar.cc/150?u=fallback'} 
+                  alt={activeClient.fullName} 
+                  style={{ width: '120px', height: '120px', borderRadius: '50%', objectFit: 'cover', border: '4px solid var(--accent-orange)' }} 
+                />
+              </div>
+              <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>{activeClient.fullName || activeClient.name}</h2>
+              <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>{activeClient.email}</p>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', textAlign: 'left' }}>
+                <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Account Status</p>
+                  <span className={`status-badge status-${activeClient.status || 'unpaid'}`}>
+                    {(activeClient.status || 'unpaid').toUpperCase()}
+                  </span>
+                </div>
+                <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Saving frequency</p>
+                  <p style={{ fontWeight: 600, textTransform: 'capitalize' }}>{activeClient.paymentFrequency || 'Monthly'}</p>
+                </div>
+                <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Member Since</p>
+                  <p style={{ fontWeight: 600 }}>{new Date(activeClient.createdAt).toLocaleDateString()}</p>
+                </div>
+                <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px solid var(--glass-border)' }}>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Client ID</p>
+                  <p style={{ fontWeight: 600, fontSize: '0.85rem' }}>{activeClient._id}</p>
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-primary" onClick={() => setShowProfileModal(false)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* View Receipt Modal */}
       {showReceiptModal && activeClient && (

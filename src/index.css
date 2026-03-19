@@ -22,6 +22,12 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent; /* Remove blue highlight on tap */
+  user-select: none; /* Disable text selection for app feel */
+}
+
+input, textarea, [contenteditable="true"] {
+  user-select: text; /* Re-enable selection for inputs */
 }
 
 body {
@@ -31,6 +37,8 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  padding-top: env(safe-area-inset-top); /* iOS Notch support */
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 /* Base App Layout */
@@ -97,12 +105,14 @@ a:hover {
   margin-bottom: 0.5rem;
   background: linear-gradient(135deg, var(--primary), var(--secondary));
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .card-title.admin-title {
   background: linear-gradient(135deg, var(--accent-orange), #ff9800);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
@@ -368,15 +378,21 @@ a:hover {
   text-transform: uppercase;
 }
 
-.status-paid {
+.status-paid, .status-verified, .status-approved {
   background: rgba(16, 185, 129, 0.1);
-  color: #34d399;
+  color: #10b981;
   border: 1px solid rgba(16, 185, 129, 0.2);
 }
 
-.status-unpaid {
+.status-pending {
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.status-unpaid, .status-rejected {
   background: rgba(239, 68, 68, 0.1);
-  color: #f87171;
+  color: #ef4444;
   border: 1px solid rgba(239, 68, 68, 0.2);
 }
 

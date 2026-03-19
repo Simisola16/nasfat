@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Nasfat Savings</string>
+    <string name="title_activity_main">Nasfat Savings</string>
+    <string name="package_name">com.nasfat.savings</string>
+    <string name="custom_url_scheme">com.nasfat.savings</string>
+</resources>
