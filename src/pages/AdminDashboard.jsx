@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
+
 import { useNavigate } from 'react-router-dom';
-import { Users, FileText, Ban, Eye, LogOut, Search, User } from 'lucide-react';
+import { Users, FileText, Ban, Eye, LogOut, Search, User, PiggyBank, Plus } from 'lucide-react';
+
 import { AdminAPI } from '../api';
 
 import { useNotification } from '../context/NotificationContext';
@@ -19,8 +21,14 @@ export default function AdminDashboard() {
   const [clients, setClients] = useState([]);
   const [totalClients, setTotalClients] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [filterDate, setFilterDate] = useState('');
+  const [filterStartDate, setFilterStartDate] = useState('');
+  const [filterEndDate, setFilterEndDate] = useState('');
   const [filterType, setFilterType] = useState('all');
+  const [expandedClientId, setExpandedClientId] = useState(null);
+  const [nestedSavings, setNestedSavings] = useState({});
+  const [grandTotal, setGrandTotal] = useState(0);
+
+
 
 
   useEffect(() => {
@@ -33,8 +41,21 @@ export default function AdminDashboard() {
         }
         
         const res = await AdminAPI.get('/api/admin/dashboard');
-        setClients(res.data.clients || []);
-        setTotalClients(res.data.totalClients || res.data.clients?.length || 0);
+        const clientsList = res.data.clients || [];
+        setClients(clientsList);
+        setTotalClients(res.data.totalClients || clientsList.length || 0);
+
+        // Calculate grand total from all clients (only paid/verified)
+        const total = clientsList.reduce((acc, client) => {
+          const savingsList = client.savings || [];
+          const paidSavings = savingsList.length > 0 
+            ? savingsList.reduce((sAcc, s) => (s.status === 'paid' || s.status === 'verified') ? sAcc + (s.amount || 0) : sAcc, 0)
+            : (client.totalSavings || 0); // Fallback to provided total if list is missing
+          return acc + paidSavings;
+        }, 0);
+        setGrandTotal(total);
+
+
 
       } catch (err) {
         console.error("Failed to fetch admin dashboard data:", err);
@@ -68,20 +89,38 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleVerifyPayment = async (savingId) => {
+  const handleVerifyPayment = async (savingId, clientId) => {
     requestConfirmation("Are you sure you want to verify this payment?", async () => {
       setLoading(true);
       try {
         await AdminAPI.put(`/api/admin/verify-saving/${savingId}`, { status: 'paid' });
         showNotification("Payment verified successfully!", 'success');
-        // Refresh data
-        if (activeClient) {
-          const res = await AdminAPI.get(`/api/admin/client/${activeClient._id}/savings`);
-          setClientStatements(res.data.savings || res.data.statements || []);
+        
+        // Refresh data for the specific client in nestedSavings
+        if (clientId) {
+          const res = await AdminAPI.get(`/api/admin/client/${clientId}/savings`);
+          const updatedRecords = res.data.savings || res.data.statements || [];
+          setNestedSavings(prev => ({
+            ...prev,
+            [clientId]: updatedRecords
+          }));
         }
-        // Also refresh main client list to update status badges
+
+        // Also refresh main client list to update status badges if needed
         const resAdmin = await AdminAPI.get('/api/admin/dashboard');
-        setClients(resAdmin.data.clients || []);
+        const clientsList = resAdmin.data.clients || [];
+        setClients(clientsList);
+
+        // Recalculate grand total (paid/verified only)
+        const total = clientsList.reduce((acc, client) => {
+          const savingsList = client.savings || [];
+          const paidSavings = savingsList.length > 0
+            ? savingsList.reduce((sAcc, s) => (s.status === 'paid' || s.status === 'verified') ? sAcc + (s.amount || 0) : sAcc, 0)
+            : (client.totalSavings || 0);
+          return acc + paidSavings;
+        }, 0);
+        setGrandTotal(total);
+
       } catch (err) {
 
         console.error("Failed to verify payment:", err);
@@ -91,6 +130,7 @@ export default function AdminDashboard() {
       }
     });
   };
+
 
   const handleGenerateStatement = async (client) => {
     setActiveClient(client);
@@ -106,7 +146,31 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleExpandClient = async (client) => {
+    if (expandedClientId === client._id) {
+      setExpandedClientId(null);
+      return;
+    }
+    
+    setExpandedClientId(client._id);
+    if (!nestedSavings[client._id]) {
+      setLoading(true);
+      try {
+        const res = await AdminAPI.get(`/api/admin/client/${client._id}/savings`);
+        setNestedSavings(prev => ({
+          ...prev,
+          [client._id]: res.data.savings || res.data.statements || []
+        }));
+      } catch (err) {
+        console.error("Failed to fetch nested savings:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
   const handleDeactivate = async (client) => {
+
     requestConfirmation(`Are you sure you want to deactivate ${client.fullName}'s account?`, async () => {
       setLoading(true);
       try {
@@ -147,10 +211,30 @@ export default function AdminDashboard() {
   const filteredClients = clients.filter(client => {
     const matchesName = client.fullName?.toLowerCase().includes(searchQuery.toLowerCase()) || 
                       client.name?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesType = filterType === 'all' || (client.paymentFrequency || '').toLowerCase() === filterType.toLowerCase();
-    const matchesDate = !filterDate || (client.createdAt || '').includes(filterDate);
-    return matchesName && matchesType && matchesDate;
+    // Only filter by type if the client has a matching frequency, otherwise show for 'all'
+    const matchesType = filterType === 'all' || 
+                      (client.paymentFrequency || '').toLowerCase() === filterType.toLowerCase() ||
+                      (client.type || '').toLowerCase() === filterType.toLowerCase();
+    
+    return matchesName && matchesType;
   });
+
+  const getClientTotal = (client) => {
+    // If we have detailed records fetched, use them as source of truth
+    if (nestedSavings[client._id]) {
+      return nestedSavings[client._id].reduce((sum, s) => (s.status === 'paid' || s.status === 'verified') ? sum + (s.amount || 0) : sum, 0);
+    }
+    // Otherwise, use the list provided by the dashboard fetch if it has savings objects
+    if (client.savings && client.savings.length > 0) {
+      return client.savings.reduce((sum, s) => (s.status === 'paid' || s.status === 'verified') ? sum + (s.amount || 0) : sum, 0);
+    }
+    // Final fallback to the summary property
+    return client.totalSavings || 0;
+  };
+
+
+
+
 
 
 
@@ -181,7 +265,17 @@ export default function AdminDashboard() {
             <div className="stat-value" style={{ color: 'var(--accent-orange)' }}>{totalClients}</div>
           </div>
         </div>
+        <div className="stat-card" style={{ background: 'rgba(240, 90, 40, 0.05)', borderColor: 'rgba(240, 90, 40, 0.2)' }}>
+          <div className="stat-icon" style={{ background: 'rgba(240, 90, 40, 0.1)', color: 'var(--accent-orange)' }}>
+            <PiggyBank size={24} />
+          </div>
+          <div className="stat-info">
+            <div className="stat-label">Total Savings Amount</div>
+            <div className="stat-value" style={{ color: 'var(--accent-orange)' }}>₦{grandTotal.toLocaleString()}</div>
+          </div>
+        </div>
       </div>
+
 
       <div className="table-container">
         <div style={{ padding: '1.5rem 1.5rem 0', display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -207,21 +301,31 @@ export default function AdminDashboard() {
               style={{ padding: '0.75rem' }}
             >
               <option value="all">All Types</option>
-              <option value="weekly">Weekly Savings</option>
-              <option value="monthly">Monthly Savings</option>
+              <option value="Personal">Personal Savings</option>
+              <option value="Joint">Joint Savings</option>
+              <option value="Fixed">Fixed Savings</option>
             </select>
           </div>
 
-          <div className="form-group" style={{ marginBottom: 0, width: '180px' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             <input 
               type="date" 
               className="form-input" 
-              value={filterDate}
-              onChange={(e) => setFilterDate(e.target.value)}
-              style={{ padding: '0.75rem' }}
+              value={filterStartDate}
+              onChange={(e) => setFilterStartDate(e.target.value)}
+              style={{ padding: '0.75rem', width: '150px' }}
+            />
+            <span style={{ color: 'var(--text-muted)' }}>to</span>
+            <input 
+              type="date" 
+              className="form-input" 
+              value={filterEndDate}
+              onChange={(e) => setFilterEndDate(e.target.value)}
+              style={{ padding: '0.75rem', width: '150px' }}
             />
           </div>
         </div>
+
 
         <table className="data-table">
           <thead>
@@ -236,76 +340,192 @@ export default function AdminDashboard() {
           </thead>
           <tbody>
             {filteredClients.map(client => (
-              <tr key={client._id || client.id}>
-                <td>
-                  <div className="client-cell">
-                    <img 
-                      src={client.profileImage || 'https://i.pravatar.cc/150?u=fallback'} 
-                      alt={client.fullName || client.name} 
-                      style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} 
-                    />
-                    <div>
-                      <div style={{ fontWeight: 600 }}>{client.fullName || client.name}</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>ID: {client._id ? client._id.substring(client._id.length - 6) : client.id}</div>
+              <Fragment key={client._id || client.id}>
+
+
+                <tr style={{ background: expandedClientId === client._id ? 'rgba(240, 90, 40, 0.05)' : 'transparent' }}>
+                  <td>
+                    <div className="client-cell">
+                      <img 
+                        src={client.profileImage || 'https://i.pravatar.cc/150?u=fallback'} 
+                        alt={client.fullName || client.name} 
+                        style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} 
+                      />
+                      <div>
+                        <div style={{ fontWeight: 600 }}>{client.fullName || client.name}</div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>ID: {client._id ? client._id.substring(client._id.length - 6) : client.id}</div>
+                      </div>
                     </div>
-                  </div>
-                </td>
-                <td>
-                  <div style={{ fontWeight: 'bold', color: 'var(--accent-orange)' }}>
-                    ₦{(client.totalSavings || 0).toLocaleString()}
-                  </div>
-                </td>
+                  </td>
+                  <td>
+                    <div style={{ fontWeight: 'bold', color: 'var(--accent-orange)' }}>
+                      ₦{getClientTotal(client).toLocaleString()}
+                    </div>
+                  </td>
 
-                <td>
-                  <span className={`status-badge status-${client.status || 'unpaid'}`}>
-                    {(client.status || 'unpaid').toUpperCase()}
-                  </span>
-                </td>
-                <td>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button 
-                      className="btn btn-outline" 
-                      style={{ padding: '0.5rem', width: 'auto' }}
-                      title="View Profile"
-                      onClick={() => handleViewProfile(client)}
-                    >
-                      <User size={16} /> View Profile
-                    </button>
-                    <button 
-                      className="btn btn-outline" 
-                      style={{ padding: '0.5rem', width: 'auto' }}
-                      title="Generate Statement"
-                      onClick={() => handleGenerateStatement(client)}
-                    >
-                      <FileText size={16} /> View Savings
-                    </button>
-                  </div>
 
-                </td>
-                <td>
-                  {client.isDeactivated || client.status === 'deactivated' ? (
-                    <button 
-                      className="btn btn-primary" 
-                      style={{ padding: '0.5rem 1rem', width: 'auto', fontSize: '0.875rem', background: 'green' }}
-                      onClick={() => handleActivate(client)}
-                      disabled={loading}
-                    >
-                      <User size={16} style={{ marginRight: '0.5rem' }} /> {loading ? 'Wait...' : 'Activate Client'}
-                    </button>
-                  ) : (
-                    <button 
-                      className="btn btn-danger" 
-                      style={{ padding: '0.5rem 1rem', width: 'auto', fontSize: '0.875rem' }}
-                      onClick={() => handleDeactivate(client)}
-                      disabled={loading}
-                    >
-                      <Ban size={16} style={{ marginRight: '0.5rem' }} /> {loading ? 'Wait...' : 'Deactivate Client'}
-                    </button>
-                  )}
+                  <td>
+                    <span className={`status-badge status-${client.status || 'unpaid'}`}>
+                      {(client.status || 'unpaid').toUpperCase()}
+                    </span>
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button 
+                        className="btn btn-outline" 
+                        style={{ padding: '0.5rem', width: 'auto' }}
+                        title="View Profile"
+                        onClick={() => handleViewProfile(client)}
+                      >
+                        <User size={16} /> View Profile
+                      </button>
+                      <button 
+                        className={`btn ${expandedClientId === client._id ? 'btn-primary' : 'btn-outline'}`}
+                        style={{ padding: '0.5rem', width: 'auto' }}
+                        title="View Savings Records"
+                        onClick={() => handleExpandClient(client)}
+                      >
+                        <PiggyBank size={16} /> {expandedClientId === client._id ? 'Hide Savings' : 'View Savings'}
+                      </button>
+                    </div>
+                  </td>
+                  <td>
+                    {client.isDeactivated || client.status === 'deactivated' ? (
+                      <button 
+                        className="btn btn-primary" 
+                        style={{ padding: '0.5rem 1rem', width: 'auto', fontSize: '0.875rem', background: 'green' }}
+                        onClick={() => handleActivate(client)}
+                        disabled={loading}
+                      >
+                        <User size={16} style={{ marginRight: '0.5rem' }} /> {loading ? 'Wait...' : 'Activate Client'}
+                      </button>
+                    ) : (
+                      <button 
+                        className="btn btn-danger" 
+                        style={{ padding: '0.5rem 1rem', width: 'auto', fontSize: '0.875rem' }}
+                        onClick={() => handleDeactivate(client)}
+                        disabled={loading}
+                      >
+                        <Ban size={16} style={{ marginRight: '0.5rem' }} /> {loading ? 'Wait...' : 'Deactivate Client'}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+                {expandedClientId === client._id && (
+                  <tr className="nested-view-row">
+                    <td colSpan="5" style={{ padding: '0 1.5rem 1.5rem', background: 'rgba(240, 90, 40, 0.02)' }}>
+                      <div className="nested-savings-container" style={{ border: '1px solid rgba(240, 90, 40, 0.2)', borderRadius: '12px', background: 'rgba(0,0,0,0.3)', padding: '1.5rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                          <h4 style={{ fontSize: '1rem', margin: 0, color: 'var(--accent-orange)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <PiggyBank size={20} /> Savings History for {client.fullName}
+                          </h4>
+                        </div>
+                        
+                        <table className="data-table" style={{ border: 'none', background: 'transparent' }}>
+                          <thead>
+                            <tr style={{ background: 'rgba(255,255,255,0.05)' }}>
+                              <th style={{ padding: '0.75rem' }}>Date</th>
+                              <th style={{ padding: '0.75rem' }}>Type</th>
+                              <th style={{ padding: '0.75rem', textAlign: 'right' }}>Amount</th>
+                              <th style={{ padding: '0.75rem', textAlign: 'center' }}>Receipt</th>
+                              <th style={{ padding: '0.75rem', textAlign: 'right' }}>Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                          {loading && !nestedSavings[client._id] ? (
+                            <tr>
+                              <td colSpan="5" style={{ textAlign: 'center', padding: '2rem' }}>
+                                <div className="loader" style={{ margin: '0 auto 1rem' }}></div>
+                                <p style={{ color: 'var(--text-muted)' }}>Fetching savings records...</p>
+                              </td>
+                            </tr>
+                          ) : (nestedSavings[client._id] || []).filter(s => {
+                            const matchesType = filterType === 'all' || (s.type || '').toLowerCase() === filterType.toLowerCase();
+                            const matchesStart = !filterStartDate || (s.createdAt || s.date) >= filterStartDate;
+                            const matchesEnd = !filterEndDate || (s.createdAt || s.date) <= (filterEndDate + 'T23:59:59');
+                            return matchesType && matchesStart && matchesEnd;
+                          }).length > 0 ? (
+                            (nestedSavings[client._id] || []).filter(s => {
+                              const matchesType = filterType === 'all' || (s.type || '').toLowerCase() === filterType.toLowerCase();
+                              const matchesStart = !filterStartDate || (s.createdAt || s.date) >= filterStartDate;
+                              const matchesEnd = !filterEndDate || (s.createdAt || s.date) <= (filterEndDate + 'T23:59:59');
+                              return matchesType && matchesStart && matchesEnd;
+                            }).map((s, idx) => (
+                              <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                <td style={{ padding: '0.75rem' }}>{new Date(s.createdAt || s.date).toLocaleDateString()}</td>
+                                <td style={{ padding: '0.75rem' }}>
+                                  <span style={{ textTransform: 'capitalize', padding: '0.2rem 0.5rem', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', fontSize: '0.8rem' }}>
+                                    {s.type || (client.paymentFrequency === 'monthly' ? 'Monthly' : 'Weekly')}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '0.75rem', textAlign: 'right', color: 'var(--accent-orange)', fontWeight: 600 }}>
+                                  ₦{(s.amount || 0).toLocaleString()}
+                                </td>
+                                <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                                  {s.receiptUrl ? (
+                                    <button 
+                                      className="btn btn-outline" 
+                                      style={{ padding: '0.25rem 0.5rem', width: 'auto', fontSize: '0.75rem', borderColor: 'var(--accent-orange)', color: 'var(--accent-orange)' }}
+                                      onClick={() => window.open(s.receiptUrl, '_blank')}
+                                    >
+                                      <Eye size={14} /> View Receipt
+                                    </button>
+                                  ) : (
+                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>No Receipt</span>
+                                  )}
+                                </td>
+                                <td style={{ padding: '0.75rem', textAlign: 'right' }}>
+                                  <span className={`status-badge status-${s.status}`} style={{ fontSize: '0.75rem' }}>
+                                    {(s.status || 'pending').toUpperCase()}
+                                  </span>
+                                  {s.status !== 'paid' && s.status !== 'verified' && (
+                                    <button 
+                                      className="btn btn-primary" 
+                                      style={{ padding: '0.2rem 0.4rem', width: 'auto', fontSize: '0.65rem', marginLeft: '0.5rem', background: '#f05a28', border: 'none' }}
+                                      onClick={() => handleVerifyPayment(s._id, client._id)}
+                                      disabled={loading}
+                                    >
+                                      {loading ? '...' : 'Verify'}
+                                    </button>
+                                  )}
+                                </td>
 
-                </td>
-              </tr>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                                {nestedSavings[client._id] ? 'No records match the current filters.' : 'No savings records found for this client.'}
+                              </td>
+                            </tr>
+                          )}
+
+                          </tbody>
+                        </table>
+                        
+                        <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1rem' }}>
+                          <div style={{ textAlign: 'right' }}>
+                            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>Total Saved (Filtered)</p>
+                            <h3 style={{ margin: 0, color: 'var(--accent-orange)' }}>
+                              ₦{(nestedSavings[client._id] || []).filter(s => {
+                                const matchesType = filterType === 'all' || (s.type || '').toLowerCase() === filterType.toLowerCase();
+                                const matchesStart = !filterStartDate || (s.createdAt || s.date) >= filterStartDate;
+                                const matchesEnd = !filterEndDate || (s.createdAt || s.date) <= (filterEndDate + 'T23:59:59');
+                                return matchesType && matchesStart && matchesEnd;
+                              }).reduce((sum, s) => sum + (s.amount || 0), 0).toLocaleString()}
+                            </h3>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
             ))}
+
+
+
+
             {filteredClients.length === 0 && (
               <tr>
                 <td colSpan="4" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
